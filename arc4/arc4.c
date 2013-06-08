@@ -60,40 +60,6 @@ static void usage(const char *progName) {
 	fprintf(stderr, "\n");
 }
 
-static void initialize_encoder(struct encoder *encoder, char *key, size_t keylen) {
-	int i = 0;
-	int j = 0;
-	uint8_t tmp = 0;
-	bzero(encoder, sizeof(struct encoder));
-	uint8_t *schedule = encoder->schedule;
-	for(i = 0; i < 256; i++) {
-		schedule[i] = i;
-	}
-	for(i = 0; i < 256; i++) {
-		int keyIdx = i % keylen;
-		uint8_t keyByte = key[keyIdx];
-		uint8_t schedByte = schedule[i];
-		j = (j + schedByte + keyByte) % 256;
-		schedule[i] = schedule[j];
-		schedule[j] = schedByte;
-	}
-}
-
-static char tick(struct encoder *encoder) {
-	uint8_t *schedule = encoder->schedule;
-	int i = encoder->i;
-	int j = encoder->j;
-	i = (i + 1) % 256;
-	j = (j + schedule[i]) % 256;
-	encoder->i = i;
-	encoder->j = j;
-	uint8_t tmp = schedule[i];
-	schedule[i] = schedule[j];
-	schedule[j] = tmp;
-	int retIdx = (schedule[i] + schedule[j]) % 256;
-	return schedule[retIdx];
-}
-
 static void emit(uint8_t c) {
 	if(asciiOutput) {
 		printf("%.2x ", c);
@@ -139,7 +105,6 @@ static bool next(uint8_t *in) {
 			uint8_t high = hexval(c1);
 			uint8_t low = hexval(c2);
 			*in = high << 4 | low;
-			fprintf(stderr, "%c%c %.2x ", c1, c2, *in);
 			ret = true;
 		}
 	}
@@ -148,6 +113,41 @@ static bool next(uint8_t *in) {
 	}
 	return ret;
 }
+
+static void initialize_encoder(struct encoder *encoder, char *key, size_t keylen) {
+	int i = 0;
+	int j = 0;
+	uint8_t tmp = 0;
+	bzero(encoder, sizeof(struct encoder));
+	uint8_t *schedule = encoder->schedule;
+	for(i = 0; i < 256; i++) {
+		schedule[i] = i;
+	}
+	for(i = 0; i < 256; i++) {
+		int keyIdx = i % keylen;
+		uint8_t keyByte = key[keyIdx];
+		uint8_t schedByte = schedule[i];
+		j = (j + schedByte + keyByte) % 256;
+		schedule[i] = schedule[j];
+		schedule[j] = schedByte;
+	}
+}
+
+static char tick(struct encoder *encoder) {
+	uint8_t *schedule = encoder->schedule;
+	int i = encoder->i;
+	int j = encoder->j;
+	i = (i + 1) % 256;
+	j = (j + schedule[i]) % 256;
+	encoder->i = i;
+	encoder->j = j;
+	uint8_t tmp = schedule[i];
+	schedule[i] = schedule[j];
+	schedule[j] = tmp;
+	int retIdx = (schedule[i] + schedule[j]) % 256;
+	return schedule[retIdx];
+}
+
 
 int main(int argc, char **argv) {
 	int optIdx = 0;
