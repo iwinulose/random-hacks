@@ -32,6 +32,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
+#include <ctype.h>
 
 static bool asciiInput = false;
 static bool asciiOutput = false;
@@ -53,7 +54,7 @@ static void usage(const char *progName) {
 	fprintf(stderr, "\n");
 	fprintf(stderr, "Optional arguments:\n");
 	fprintf(stderr, "\t-a: translate output bytes to hex\n");
-	// fprintf(stderr, "\t-A: translate input bytes from hex (each byte expected to be 2 ascii characters, whitespace ignored)\n");
+	fprintf(stderr, "\t-A: translate input bytes from hex (each byte expected to be 2 ascii characters, whitespace ignored)\n");
 	fprintf(stderr, "\t-k: output a byte of the key stream for each byte of the input stream (no encoding)\n");
 	fprintf(stderr, "\t-h: print this help message to stderr\n");
 	fprintf(stderr, "\n");
@@ -102,8 +103,50 @@ static void emit(uint8_t c) {
 	}
 }
 
+static char next_char(void) {
+	char c = '\0';
+	while ( (c = getchar()) != EOF) {
+		if (isspace(c)) {
+			continue;
+		}
+		c = tolower(c);
+		if (isdigit(c) || (c >= 'a' && c <= 'f')) {
+			break;
+		}
+		fprintf(stderr, "Illegal character in input %c", c);
+		exit(1);
+	}
+	return c;
+}
+
+static uint8_t hexval(char c) {
+	uint8_t ret = 0;
+	if(isdigit(c)) {
+		ret =  c - '0';
+	}
+	else {
+		ret = c - 'a' + 10;
+	}
+	return ret;
+}
+
 static bool next(uint8_t *in) {
-	return fread(in, 1, 1, stdin) == 1;
+	bool ret = false;
+	if (asciiInput) {
+		char c1 = next_char();
+		char c2 = next_char();
+		if (c1 != EOF && c2 != EOF) {
+			uint8_t high = hexval(c1);
+			uint8_t low = hexval(c2);
+			*in = high << 4 | low;
+			fprintf(stderr, "%c%c %.2x ", c1, c2, *in);
+			ret = true;
+		}
+	}
+	else {
+		ret = (fread(in, 1, 1, stdin) == 1);
+	}
+	return ret;
 }
 
 int main(int argc, char **argv) {
@@ -135,9 +178,9 @@ int main(int argc, char **argv) {
 				case 'a':
 					asciiOutput = true;
 					break;
-				// case 'A':
-				// 	asciiInput = true;
-				// 	break;
+				case 'A':
+					asciiInput = true;
+					break;
 				case 'k':
 					keyOut = true;
 					break;
