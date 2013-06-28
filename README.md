@@ -14,6 +14,10 @@ Basically a poor man's xargs.
 
 I couldn't remember/figure out how to make sed output lines of a given character length, plus who wants to do word wrapping in sed.
 
+### 2{dec,hex}.c
+
+Simple integer conversion tools
+
 ## licenses
 
 Just a bunch of licenses formatted for source code in different languages.
