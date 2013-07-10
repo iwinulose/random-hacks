@@ -2,6 +2,12 @@
 
 A very basic arc4 implementation. Don't use it if you actually want your stuff to be safe.
 
+## imgur
+
+### slurpur.py
+
+Downloads albums from imgur
+
 ## funix
 
 Fake unix. Because sometiems regular UNIX utilities are obtuse. Or I hate the manpage. 
