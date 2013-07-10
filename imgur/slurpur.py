@@ -34,12 +34,7 @@ import os
 
 parser = None
 client_id = "7259c2beefdb373"
-
-def improper_usage(msg):
-	if msg:
-		sys.stderr.write(msg)
-	parser.print_help(file=sys.stderr)
-	sys.exit(1)
+auth_header = {"Authorization" : "Client-ID %s" % client_id}
 
 def is_imgur_url(url):
 	base = url.netloc
@@ -48,14 +43,35 @@ def is_imgur_url(url):
 		base = url.path
 	return "imgur.com" in base.lower()
 
-def parse_album_url(url):
-	# for now we only care about album URLs with the album as the last component
-	path = url.path
-	# trim any trailing slashes
+def improper_usage(msg):
+	if msg:
+		sys.stderr.write(msg)
+	parser.print_help(file=sys.stderr)
+	sys.exit(1)
+
+def trim_slashes(path):
 	while path[-1] == '/' and len(path):
 		path = path[:-1]
+	return path
+
+def last_component(url):
+	path = trim_slashes(url.path)
 	_, tail = posixpath.split(path)
 	return tail
+
+def is_album_url(url):
+	return "/a/" in url.path
+
+def is_image_url(url):
+	last = last_component(url)
+	name, ext = posixpath.splitext(last)
+	return not len(ext)
+
+def output_path_for_url(url):
+	path = "."
+	if is_album_url(url):
+		path = last_component(url)
+	return path
 
 def prepare_destination(path):
 	# technically a race here.
@@ -68,13 +84,35 @@ def prepare_destination(path):
 			return False
 		return True
 
-def album_api_url(name):
-	return "https://api.imgur.com/3/album/%s/images" % name
+def album_api_url(id):
+	return "https://api.imgur.com/3/album/%s/images" % id 
+
+def image_api_url(id):
+	return "https://api.imgur.com/3/image/%s" % id
+
+def images(url):
+	if is_album_url(url):
+		album_id = last_component(url)
+		album_url = album_api_url(album_id)
+		album_response = requests.get(album_url, headers=auth_header)
+		response_json = album_response.json()
+		image_list = response_json["data"]
+		for image_json in image_list:
+			yield image_json["link"]
+	elif is_image_url(url):
+		image_id = last_component(url)
+		image_url = image_api_url(image_id)
+		image_response = requests.get(image_url, headers=auth_header)
+		response_json = image_response.json()
+		image = response_json["data"]
+		yield image["link"]
+	else:
+		yield urlparse.urlunparse(url)
 
 def main():
 	global parser
 	parser = argparse.ArgumentParser()
-	parser.add_argument("url", help="Imgur album url")
+	parser.add_argument("url", help="Imgur url")
 	parser.add_argument("-o", "--output", help="Output directory. It is created if it does not exist. (default: same as album name)")
 	parser.add_argument("-p", "--prefix", help="Image prefix. If present, each image is saved with the given prefix, follwed by a hyphen, a unique digit, and the extension. (e.g. prefix-%%u.ext)")
 	args = parser.parse_args()
@@ -83,24 +121,15 @@ def main():
 	url = urlparse.urlparse(url_arg)
 	if not is_imgur_url(url):
 		improper_usage("Must provide an imgur url (found %s)\n" % url_arg)
-	album_name = parse_album_url(url)
-	if not album_name:
-		improper_usage("Could not parse album name from url %s\n" % url_arg)
 	output_path = args.output
 	if output_path is None:
-		output_path = album_name
-	ok = prepare_destination(output_path)
-	if not ok:
+		output_path = output_path_for_url(url)
+	destination_ok = prepare_destination(output_path)
+	if not destination_ok:
 		improper_usage("Invalid output path %s\n" % output_path)
-	auth_header = {"Authorization" : "Client-ID %s" % client_id}
-	album_url = album_api_url(album_name)
-	album_response = requests.get(album_url, headers=auth_header)
-	response_json = album_response.json()
-	image_list = response_json["data"]
 	i = 0
-	for image_json in image_list:
+	for image_url_str in images(url):
 		try:
-			image_url_str = image_json["link"]
 			image_url = urlparse.urlparse(image_url_str)
 			_, file_name = posixpath.split(image_url.path)
 			if prefix:
