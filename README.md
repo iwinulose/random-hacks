@@ -20,9 +20,14 @@ Basically a poor man's xargs.
 
 I couldn't remember/figure out how to make sed output lines of a given character length, plus who wants to do word wrapping in sed.
 
+### box.py
+
+An extremely simple pretty printer. Puts strings in boxes. Use with wrap.py for dramatic results.
+
 ### 2{dec,hex}.c
 
 Simple integer conversion tools
+
 
 ## licenses
 
