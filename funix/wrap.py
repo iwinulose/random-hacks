@@ -34,17 +34,21 @@ DEFAULT_WIDTH = 80
 
 if __name__ == "__main__":
 	parser = argparse.ArgumentParser()
+	readable = argparse.FileType('r')
 	parser.add_argument("-w", "--width", help="Width to wrap lines to (default %d)" % DEFAULT_WIDTH, type=int, default=DEFAULT_WIDTH)
 	parser.add_argument("-p", "--prefix", help="Prefix to add at the beginning of parsed lines", default="")
+	parser.add_argument("file", type=readable, help="File to read from (default: stdin)", nargs='?', default=sys.stdin)
 	args = parser.parse_args()
 	width = args.width
 	prefix = args.prefix
+	in_file = args.file
 	if width < 0:
 		sys.stderr.write("Width may not be negative\n")
 		sys.exit(1)
 	wrapper = textwrap.TextWrapper()
 	wrapper.width = width
 	wrapper.subsequent_indent = prefix
-	for line in sys.stdin:
+	for line in in_file:
 		print wrapper.fill(line)
+	in_file.close()
 
