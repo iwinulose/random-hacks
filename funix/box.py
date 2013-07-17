@@ -132,11 +132,17 @@ def main():
 	parser = argparse.ArgumentParser(description=prog_description)
 	readable = argparse.FileType('r')
 	parser.add_argument("file", type=readable, help="File to read from (default: stdin)", nargs='?', default=sys.stdin)
+	parser.add_argument("--fill", help="Fill text for the box", default=" ")
+	parser.add_argument("--hsep", help="Set the horizontal seperator", default="|")
+	parser.add_argument("--vsep", help="Set the vertical seperator", default="_")
 	args = parser.parse_args()
 	in_file = args.file
+	fill = args.fill
+	hsep = args.hsep
+	vsep = args.vsep
 	groups = parse_input(in_file)
 	in_file.close()
-	formatter = BoxFormatter(groups=groups)
+	formatter = BoxFormatter(groups=groups, h_sep=hsep, v_sep=vsep, fill=fill)
 	print formatter.format()
 
 if __name__ == "__main__":
