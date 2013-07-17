@@ -44,6 +44,12 @@ def max_line_len(groups):
 			max_len = max(max_len, line_len)
 	return max_len
 
+def repeated_chars_from_string(string, num):
+	str_len = len(string)
+	repeats = num/str_len
+	remain = num % str_len
+	return repeats*string + string[:remain]
+
 class BoxFormatter(object):
 	def __init__(self, groups=None, h_padding=2, v_padding=1, h_sep="|", v_sep="_", fill=" "):
 		self.groups = groups
@@ -59,26 +65,30 @@ class BoxFormatter(object):
 		if not add_h_sep:
 			h_sep = ""
 		rule_len = self.box_width - 2*len(h_sep)
-		return h_sep + rule_len*self.v_sep + h_sep
+		rule_fill = repeated_chars_from_string(self.v_sep, rule_len)
+		return h_sep + rule_fill + h_sep
 	
 	def _gen_blank(self):
 		"""Returns a blank line with the horizontal separators"""
-		return self.h_sep + self.inner_width*self.fill + self.h_sep
+		blank_fill = repeated_chars_from_string(self.fill, self.inner_width)
+		return self.h_sep + blank_fill + self.h_sep
 	
 	def _preflight(self):
 		"""Sets up the BoxFormatter for the current lines"""
 		longest_line = max_line_len(self.groups)
-		self.inner_width = longest_line + 2*self.h_padding*len(self.fill) 
+		self.inner_width = longest_line + 2*self.h_padding
 		self.box_width = self.inner_width + 2*len(self.h_sep) 
 		self._rule = self._gen_rule()
 		self._blank = self._gen_blank()
 	
 	def _format_line(self, line):
 		padding_amount = self.inner_width - len(line)
-		padding_before = padding_after = padding_amount/2
+		num_padding_before = num_padding_after = padding_amount/2
 		if padding_amount % 2:
-			padding_after += 1
-		return self.h_sep + padding_before * self.fill + line + padding_after*self.fill + self.h_sep
+			num_padding_after += 1
+		padding_before = repeated_chars_from_string(self.fill, num_padding_before)
+		padding_after = repeated_chars_from_string(self.fill, num_padding_after)
+		return self.h_sep + padding_before + line + padding_after + self.h_sep
 		
 	def format(self, groups=None):
 		if groups:
