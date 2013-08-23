@@ -115,13 +115,15 @@ def main():
 	parser.add_argument("url", help="Imgur url")
 	parser.add_argument("-o", "--output", help="Output directory. It is created if it does not exist. (default: same as album name)")
 	parser.add_argument("-p", "--prefix", help="Image prefix. If present, each image is saved with the given prefix, follwed by a hyphen, a unique digit, and the extension. (e.g. prefix-%%u.ext)")
+	parser.add_argument("-d", "--dry-run", help="Print url to download, but don't download", action="store_true")
 	args = parser.parse_args()
-	prefix = args.prefix
 	url_arg = args.url
+	output_path = args.output
+	prefix = args.prefix
+	dry_run = args.dry_run
 	url = urlparse.urlparse(url_arg)
 	if not is_imgur_url(url):
 		improper_usage("Must provide an imgur url (found %s)\n" % url_arg)
-	output_path = args.output
 	if output_path is None:
 		output_path = output_path_for_url(url)
 	destination_ok = prepare_destination(output_path)
@@ -137,11 +139,14 @@ def main():
 				file_name = "%s-%u%s" % (prefix, i, extension)
 				i += 1
 			destination = os.path.join(output_path, file_name)
-			print "Downloading %s to %s" % (image_url_str, destination)
-			image_response = requests.get(image_url_str, headers=auth_header)
-			image_response.raise_for_status()
-			with open(destination, "w") as f:
-				f.write(image_response.content)
+			if dry_run:
+				print "Would download %s to %s" % (image_url_str, destination)
+			else:
+				print "Downloading %s to %s" % (image_url_str, destination)
+				image_response = requests.get(image_url_str, headers=auth_header)
+				image_response.raise_for_status()
+				with open(destination, "w") as f:
+					f.write(image_response.content)
 		except Exception as e:
 			sys.stderr.write("Could not fetch %s: %s\n" % (image_url_str, e))
 
