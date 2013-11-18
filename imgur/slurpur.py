@@ -32,7 +32,6 @@ import posixpath
 import sys
 import os
 
-parser = None
 client_id = "7259c2beefdb373"
 auth_header = {"Authorization" : "Client-ID %s" % client_id}
 
@@ -43,7 +42,7 @@ def is_imgur_url(url):
 		base = url.path
 	return "imgur.com" in base.lower()
 
-def improper_usage(msg):
+def improper_usage(msg, parser):
 	if msg:
 		sys.stderr.write(msg)
 	parser.print_help(file=sys.stderr)
@@ -110,7 +109,6 @@ def images(url):
 		yield urlparse.urlunparse(url)
 
 def main():
-	global parser
 	parser = argparse.ArgumentParser()
 	parser.add_argument("url", help="Imgur url")
 	parser.add_argument("-o", "--output", help="Output directory. It is created if it does not exist. (default: same as album name)")
@@ -123,12 +121,12 @@ def main():
 	dry_run = args.dry_run
 	url = urlparse.urlparse(url_arg)
 	if not is_imgur_url(url):
-		improper_usage("Must provide an imgur url (found %s)\n" % url_arg)
+		improper_usage("Must provide an imgur url (found %s)\n" % url_arg, parser)
 	if output_path is None:
 		output_path = output_path_for_url(url)
 	destination_ok = prepare_destination(output_path)
 	if not destination_ok:
-		improper_usage("Invalid output path %s\n" % output_path)
+		improper_usage("Invalid output path %s\n" % output_path, parser)
 	i = 0
 	for image_url_str in images(url):
 		try:
