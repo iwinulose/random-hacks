@@ -125,13 +125,9 @@ bool sdbm_open(const char *name) {
 		ret = true;
 	}
 	if (ret) {
-		_current_db = escaped_name;
+		_current_db = realpath(escaped_name, NULL);;
 	}
-	else {
-		if (escaped_name) {
-			free(escaped_name);
-		}
-	}
+	if (escaped_name) { free(escaped_name); }
 	return ret;
 }
 

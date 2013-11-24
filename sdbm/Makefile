@@ -1,11 +1,13 @@
 CC=clang
 CFLAGS=-Wall -Wextra -pedantic
 
-sdbm: escape.o sdbm.o main.c
+sdbm: escape.o sdbm.o main.o
+
+main.o: main.c
 
 escape.o: escape.c
 
 sdbm.o: sdbm.c 
 
 clean:
-	rm sdbm escape.o sdbm.o
+	rm sdbm escape.o sdbm.o main.o

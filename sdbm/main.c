@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include "sdbm.h"
 
-int main(int argc, char **argv) {
+int main(void) {
 	sdbm_create("helloworld");
 	sdbm_open("helloworld");
 	sdbm_insert("doge", "googogo");

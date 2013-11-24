@@ -147,12 +147,12 @@ int escape_string(char *dest, const char *src, const size_t dest_len) {
 	size_t dest_remain = dest_len - 1;
 	bool stop = false;
 	while((c = *src++) && dest_remain && !stop) {
-		const translation_s *translate = &_lookup[c];
+		const translation_s *translate = &_lookup[(int)c];
 		const size_t len = translate->len;
 		const char *escape = translate->str;
 		stop = dest_remain < len;
 		if (!stop) {
-			for (int i = 0; i < len; i++) {
+			for (size_t i = 0; i < len; i++) {
 				*dest++ = escape[i];
 			}
 			dest_remain -= len;
