@@ -28,6 +28,9 @@ An extremely simple pretty printer. Puts strings in boxes. Use with wrap.py for 
 
 Simple integer conversion tools
 
+## sdbm
+
+A toy "database" given out as an asignment in my college intro cs class. 
 
 ## licenses
 
