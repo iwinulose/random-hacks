@@ -49,7 +49,7 @@ def improper_usage(msg, parser):
 	sys.exit(1)
 
 def trim_slashes(path):
-	while path[-1] == '/' and len(path):
+	while path and path[-1] == '/':
 		path = path[:-1]
 	return path
 
@@ -114,6 +114,7 @@ def main():
 	parser.add_argument("-o", "--output", help="Output directory. It is created if it does not exist. (default: same as album name)")
 	parser.add_argument("-p", "--prefix", help="Image prefix. If present, each image is saved with the given prefix, follwed by a hyphen, a unique digit, and the extension. (e.g. prefix-%%u.ext)")
 	parser.add_argument("-d", "--dry-run", help="Print url to download, but don't download", action="store_true")
+#	parser.add_argument("--debug", help="Enable debug logging", action="store_true")
 	args = parser.parse_args()
 	url_arg = args.url
 	output_path = args.output
