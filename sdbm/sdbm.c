@@ -170,6 +170,10 @@ static bool _file_exists(const char *path) {
  */
 bool sdbm_has(const char *key) {
 	DB_OPEN_GUARD();
+	if (!key) {
+		_set_err(DB_PARAM_ERR);
+		return false;
+	}
 	bool ret = false;
 	char *path = _make_path_for_key(key);
 	if (!path) {
@@ -189,6 +193,10 @@ bool sdbm_has(const char *key) {
  */
 bool sdbm_get(const char *key, char *value) {
 	DB_OPEN_GUARD();
+	if (!key || !value) {
+		_set_err(DB_PARAM_ERR);
+		return false;
+	}
 	char *path = _make_path_for_key(key);
 	if (!path) {
 		_set_err(DB_NOMEM);
@@ -211,6 +219,10 @@ bool sdbm_get(const char *key, char *value) {
 }
 
 static bool _update_db(const char *key, const char *value, bool should_exist) {
+	if (!key || !value) {
+		_set_err(DB_PARAM_ERR);
+		return false;
+	}
 	char *path = _make_path_for_key(key);
 	if (!path) {
 		_set_err(DB_NOMEM);
@@ -269,6 +281,10 @@ bool sdbm_insert(const char *key, const char *value) {
  */
 bool sdbm_remove(const char *key) {
 	DB_OPEN_GUARD();
+	if (!key) {
+		_set_err(DB_PARAM_ERR);
+		return false;
+	}
 	char *path = _make_path_for_key(key);
 	if (!path) {
 		_set_err(DB_NOMEM);
