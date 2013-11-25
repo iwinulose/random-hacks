@@ -160,14 +160,14 @@ int sdbm_error(void) {
 	return _last_err;
 }
 
-/**
- * Is given key in database?
- */
 
 static bool _file_exists(const char *path) {
 	return access(path, F_OK) == 0;
 }
 
+/**
+ * Is given key in database?
+ */
 bool sdbm_has(const char *key) {
 	DB_OPEN_GUARD();
 	bool ret = false;
