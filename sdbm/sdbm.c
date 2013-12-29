@@ -219,6 +219,7 @@ bool sdbm_get(const char *key, char *value) {
 }
 
 static bool _update_db(const char *key, const char *value, bool should_exist) {
+	DB_OPEN_GUARD();
 	if (!key || !value) {
 		_set_err(DB_PARAM_ERR);
 		return false;
@@ -257,7 +258,6 @@ static bool _update_db(const char *key, const char *value, bool should_exist) {
  * Precondition: sdbm_has(key)
  */
 bool sdbm_put(const char *key, const char *value) {
-	DB_OPEN_GUARD();
 	return _update_db(key, value, true);
 }
 
@@ -269,7 +269,6 @@ bool sdbm_put(const char *key, const char *value) {
  * Precondition: !sdbm_has(key)
  */
 bool sdbm_insert(const char *key, const char *value) {
-	DB_OPEN_GUARD();
 	return _update_db(key, value, false);
 }
 
