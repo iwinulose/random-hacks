@@ -25,6 +25,7 @@
 # LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
 # ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
+"""Update the ID3 tags of MP3s in the format "## Title - Composer.mp3"""
 import glob
 import os.path
 import argparse
