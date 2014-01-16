@@ -2,11 +2,11 @@
 
 A very basic arc4 implementation. Don't use it if you actually want your stuff to be safe.
 
-## imgur
+## bmi
 
-### slurpur.py
+### bmi.py
 
-Downloads albums from imgur
+BMI calculator. Don't use if you have body image issues.
 
 ## funix
 
@@ -28,17 +28,26 @@ An extremely simple pretty printer. Puts strings in boxes. Use with wrap.py for 
 
 Simple integer conversion tools
 
-## bmi
+## imgur
 
-### bmi.py
+### slurpur.py
 
-BMI calculator. Don't use if you have body image issues.
+Downloads albums from imgur
+
+## licenses
+
+Just a bunch of licenses formatted for source code in different languages.
+
+## reddit
+
+Some tools for interracting with the reddit api
+
+### submitted.py
+
+Get URLs of a user's submissions
 
 ## sdbm
 
 A toy "database" given out as an asignment in my college intro cs class. 
 
-## licenses
-
-Just a bunch of licenses formatted for source code in different languages.
 
