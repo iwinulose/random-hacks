@@ -27,7 +27,6 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 
-
 def lbs_to_kgs(lbs):
 	return .453592 * lbs
 
@@ -54,6 +53,24 @@ def bmi_imperial(lbs, ft, inches):
 
 def weight_for_bmi(height, bmi):
 	return bmi*pow(height, 2)
+
+def healthiness(bmi):
+	if bmi < 15.0:
+		return "Very severely underweight"
+	elif 15.0 <= bmi < 16.0:
+		return "Severely underweight"
+	elif 16.0 <= bmi < 18.5:
+		return "Underweight"
+	elif 18.5 <= bmi < 25.0:
+		return "Normal"
+	elif 25.0 <= bmi < 30.0:
+		return "Overweight"
+	elif 30.0 <= bmi < 35.0:
+		return "Moderately obese"
+	elif 35.0 <= bmi < 40:
+		return "Severely obese"
+	else:
+		return "Very severely obese"
 
 
 class Calculator(object):
@@ -114,7 +131,7 @@ if __name__ == "__main__":
 	calc = Calculator(ft=ft, inches=inches, m=meters, lbs=lbs, kgs=kgs)
 	if lbs or kgs:
 		bmi = calc.bmi()
-		print "Your BMI is %.01f" % (bmi)
+		print "Your BMI is %.01f (%s)" % (bmi, healthiness(bmi))
 	if target:
 		unit = "undef"
 		target_weight = calc.weight_for_bmi(target)
