@@ -1,4 +1,4 @@
-// Copyright (c) 2013, Charles Duyk
+// Copyright (c) 2014, Charles Duyk
 // All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
