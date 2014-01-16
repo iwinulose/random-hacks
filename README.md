@@ -18,7 +18,7 @@ Basically a poor man's xargs.
 
 ### wrap.py
 
-I couldn't remember/figure out how to make sed output lines of a given character length, plus who wants to do word wrapping in sed.
+I forgot about fmt and couldn't remember/figure out how to make sed output lines of a given character length, plus who wants to do word wrapping in sed.
 
 ### box.py
 
@@ -28,6 +28,11 @@ An extremely simple pretty printer. Puts strings in boxes. Use with wrap.py for 
 
 Simple integer conversion tools
 
+## bmi
+
+### bmi.py
+
+BMI calculator. Don't use if you have body image issues.
 
 ## licenses
 
