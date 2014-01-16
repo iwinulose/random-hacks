@@ -34,6 +34,10 @@ Simple integer conversion tools
 
 BMI calculator. Don't use if you have body image issues.
 
+## sdbm
+
+A toy "database" given out as an asignment in my college intro cs class. 
+
 ## licenses
 
 Just a bunch of licenses formatted for source code in different languages.
