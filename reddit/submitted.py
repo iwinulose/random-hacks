@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# Copyright (c) 2013, Charles Duyk
+# Copyright (c) 2014, Charles Duyk
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -31,6 +31,9 @@
 import argparse
 import requests
 import sys
+
+#TODO:
+# - option for more than just submission (comment, all)
 
 def make_url(username):
 	"""Create the API url for submissions"""
