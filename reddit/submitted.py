@@ -31,6 +31,11 @@
 import argparse
 import requests
 import sys
+import webbrowser
+
+_headers = {
+	"User-Agent" : "submitted.py/0.1 by iwinulose"
+}
 
 def make_url(username):
 	"""Create the API url for submissions"""
@@ -43,7 +48,7 @@ def submitted_urls(username, after=None):
 	if after:
 		params["after"] = after
 	base_url = make_url(username)
-	resp = requests.get(base_url, params=params)
+	resp = requests.get(base_url, params=params, headers=_headers)
 	if resp.status_code != 200:
 		sys.stderr.write("Got a bad response ({})\n".format(resp))
 		return set()
@@ -59,8 +64,14 @@ def submitted_urls(username, after=None):
 if __name__ == "__main__":
 	parser = argparse.ArgumentParser(description="Lists all the (unique) urls of posts by a given reddit user")
 	parser.add_argument("username", help="The username")
+	parser.add_argument("--open", action="store_true", help="Open the links in a browser")
 	args = parser.parse_args()
 	username = args.username
+	should_open = args.open
 	urls = submitted_urls(username)
-	print "\n".join(urls)
+	if urls:
+		print "\n".join(urls)
+		if should_open:
+			for url in urls:
+				webbrowser.open(url)
 
