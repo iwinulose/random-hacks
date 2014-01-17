@@ -107,47 +107,69 @@ def images(url):
 		yield image["link"]
 	else:
 		yield urlparse.urlunparse(url)
+	
+def process_file(aFile):
+	pass
 
 def main():
-	parser = argparse.ArgumentParser()
-	parser.add_argument("url", help="Imgur url")
-	parser.add_argument("-o", "--output", help="Output directory. It is created if it does not exist. (default: same as album name)")
-	parser.add_argument("-p", "--prefix", help="Image prefix. If present, each image is saved with the given prefix, follwed by a hyphen, a unique digit, and the extension. (e.g. prefix-%%u.ext)")
-	parser.add_argument("-d", "--dry-run", help="Print url to download, but don't download", action="store_true")
-#	parser.add_argument("--debug", help="Enable debug logging", action="store_true")
+	parser = argparse.ArgumentParser(description="Downloads albums or images from imgur.com.")
+	parser.add_argument("arg", metavar="url-or-filename", nargs="?", help="""An
+	imgur url (for an album or image), or a filename if the --file argument is
+	present. If absent, the script reads URLs from stdin, one url per line.""")
+	parser.add_argument("-o", "--output", help="""Output directory. It is created
+	if it does not exist. (default: same as album name)""")
+	parser.add_argument("-p", "--prefix", help="""Image prefix. If present,
+	each image is saved with the given prefix, follwed by a hyphen, a unique
+	digit, and the extension. (e.g. prefix-%%u.ext)""")
+	parser.add_argument("-d", "--dry-run", action="store_true", help="""Print
+	url to download, but don't download""") 
+	parser.add_argument("--file", action="store_true", help="""Treat the argument
+	as a file name. The file should contain imgur URLs, one url per line.""")
 	args = parser.parse_args()
-	url_arg = args.url
-	output_path = args.output
-	prefix = args.prefix
-	dry_run = args.dry_run
-	url = urlparse.urlparse(url_arg)
-	if not is_imgur_url(url):
-		improper_usage("Must provide an imgur url (found %s)\n" % url_arg, parser)
-	if output_path is None:
-		output_path = output_path_for_url(url)
-	destination_ok = prepare_destination(output_path)
-	if not destination_ok:
-		improper_usage("Invalid output path %s\n" % output_path, parser)
-	i = 0
-	for image_url_str in images(url):
-		try:
-			image_url = urlparse.urlparse(image_url_str)
-			_, file_name = posixpath.split(image_url.path)
-			if prefix:
-				_, extension = posixpath.splitext(file_name)
-				file_name = "%s-%u%s" % (prefix, i, extension)
-				i += 1
-			destination = os.path.join(output_path, file_name)
-			if dry_run:
-				print "Would download %s to %s" % (image_url_str, destination)
-			else:
-				print "Downloading %s to %s" % (image_url_str, destination)
-				image_response = requests.get(image_url_str, headers=auth_header)
-				image_response.raise_for_status()
-				with open(destination, "w") as f:
-					f.write(image_response.content)
-		except Exception as e:
-			sys.stderr.write("Could not fetch %s: %s\n" % (image_url_str, e))
+	in_arg = args.arg
+	if args.file or not in_arg:
+		in_file = sys.stdin
+		if in_arg:
+			try:
+				in_file = open(in_arg, "r")
+			except IOError as e:
+				improper_usage("Unable to open {}".format(in_arg), parser)
+		process_file(in_file)
+		return
+	else:
+		return
+		url_arg = args.arg
+		output_path = args.output
+		prefix = args.prefix
+		dry_run = args.dry_run
+		url = urlparse.urlparse(url_arg)
+		if not is_imgur_url(url):
+			improper_usage("Must provide an imgur url (found %s)\n" % url_arg, parser)
+		if output_path is None:
+			output_path = output_path_for_url(url)
+		destination_ok = prepare_destination(output_path)
+		if not destination_ok:
+			improper_usage("Invalid output path %s\n" % output_path, parser)
+		i = 0
+		for image_url_str in images(url):
+			try:
+				image_url = urlparse.urlparse(image_url_str)
+				_, file_name = posixpath.split(image_url.path)
+				if prefix:
+					_, extension = posixpath.splitext(file_name)
+					file_name = "%s-%u%s" % (prefix, i, extension)
+					i += 1
+				destination = os.path.join(output_path, file_name)
+				if dry_run:
+					print "Would download %s to %s" % (image_url_str, destination)
+				else:
+					print "Downloading %s to %s" % (image_url_str, destination)
+					image_response = requests.get(image_url_str, headers=auth_header)
+					image_response.raise_for_status()
+					with open(destination, "w") as f:
+						f.write(image_response.content)
+			except Exception as e:
+				sys.stderr.write("Could not fetch %s: %s\n" % (image_url_str, e))
 
 if __name__ == "__main__":
 	main()
