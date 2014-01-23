@@ -154,6 +154,8 @@ def main(args):
 	if not urls:
 		print "No imgur urls provided"
 		return 0
+	
+	print "Downloading from {} urls".format(len(urls))
 
 	dest_ok = prepare_destination(output_directory)
 	if not dest_ok:
@@ -166,8 +168,6 @@ def main(args):
 		if not should_flatten:
 			subdir = subdir_for_url(url_parts)
 			final_output_dir = os.path.join(output_directory, subdir)
-		else:
-			counter = 0
 		dest_ok = prepare_destination(final_output_dir)
 		if not dest_ok:
 			print "Could not write to {}".format(final_output_dir)
