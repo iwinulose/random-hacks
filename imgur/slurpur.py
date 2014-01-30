@@ -26,6 +26,7 @@
 # ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 import requests
+from requests.exceptions import RequestException
 import argparse
 import urlparse
 import posixpath
@@ -78,23 +79,30 @@ def image_api_url(id):
 	return "https://api.imgur.com/3/image/%s" % id
 
 def images(url_parts):
-	if is_album_url(url_parts):
+	api_url = ""
+	is_album = is_album_url(url_parts)
+	is_image = is_image_url(url_parts)
+
+	if is_album:
 		album_id = last_component(url_parts) 
-		album_url = album_api_url(album_id)
-		album_response = requests.get(album_url, headers=auth_header)
-		response_json = album_response.json()
+		api_url = album_api_url(album_id)
+	elif is_image:
+		image_id = last_component(url_parts)
+		api_url = image_api_url(image_id)
+	else:
+		yield urlparse.urlunparse(url_parts)
+
+	api_response = requests.get(api_url, headers=auth_header)
+	api_response.raise_for_status()
+	response_json = api_response.json()
+	
+	if is_album:
 		image_list = response_json["data"]
 		for image_json in image_list:
 			yield image_json["link"]
-	elif is_image_url(url_parts):
-		image_id = last_component(url_parts)
-		image_url = image_api_url(image_id)
-		image_response = requests.get(image_url, headers=auth_header)
-		response_json = image_response.json()
+	else:
 		image = response_json["data"]
 		yield image["link"]
-	else:
-		yield urlparse.urlunparse(url_parts)
 
 def download(url, destination):
 	response = requests.get(url, headers=auth_header)
@@ -134,12 +142,16 @@ def make_filename(url, prefix, counter):
 	return "{}{}".format(base, ext)
 
 def process(url_parts, output_dir=".", prefix=None, counter=0):
-	for url in images(url_parts):
-		filename = make_filename(url, prefix, counter)
-		filename = os.path.join(output_dir, filename)
-		print "Downloading {} to {}".format(url, filename)
-		download(url, filename)
-		counter += 1
+	try:
+		for url in images(url_parts):
+			filename = make_filename(url, prefix, counter)
+			filename = os.path.join(output_dir, filename)
+			print "Downloading {} to {}".format(url, filename)
+			download(url, filename)
+			counter += 1
+	except RequestException as e:
+		url = urlparse.urlunparse(url_parts)
+		sys.stderr.write("Error downloading from url {}: {}\n".format(url, e))
 	return counter
 
 def main(args):
