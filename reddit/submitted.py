@@ -62,6 +62,7 @@ def submitted_urls(username, after=None):
 	if after:
 		next = submitted_urls(username, after)
 		urls = urls.union(next)
+	urls = set(map(unicode, urls))
 	return urls
 	
 if __name__ == "__main__":
