@@ -129,7 +129,7 @@ def urls_for_args(in_arg, is_filename):
 		urls = [line.strip() for line in in_file]
 	else:
 		urls = [in_arg]
-	urls = map(unicode, urls)
+	urls = map(lambda x: x.decode('utf-8'), urls)
 	urls = map(urlparse.urlparse, urls)
 	return urls
 

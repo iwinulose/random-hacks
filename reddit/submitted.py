@@ -62,7 +62,6 @@ def submitted_urls(username, after=None):
 	if after:
 		next = submitted_urls(username, after)
 		urls = urls.union(next)
-	urls = set(map(unicode, urls))
 	return urls
 	
 if __name__ == "__main__":
@@ -74,6 +73,7 @@ if __name__ == "__main__":
 	should_open = args.open
 	urls = submitted_urls(username)
 	if urls:
+		urls = map(lambda url: url.encode('utf-8'), urls)
 		print "\n".join(urls)
 		if should_open:
 			for url in urls:
