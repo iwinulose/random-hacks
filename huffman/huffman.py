@@ -29,6 +29,14 @@ import sys
 import heapq
 import pprint
 
+def _substrings_of_length(string, n, padding):
+	length = len(string)
+	num_substrs = length / n
+	if length % n:
+		num_substrs += 1
+	for i in xrange(num_substrs):
+		yield string[i*n:i*n+n].ljust(n, padding)
+
 class DecodeError(Exception):
 	pass
 
@@ -73,7 +81,8 @@ class Huffman(object):
 			return freqs 
 
 		def build_nodes(freqs):
-			return map(lambda (char, val): HuffmanNode(char, val), freqs.iteritems())
+			return [HuffmanNode(char, val) for (char, val) in freqs.iteritems()]
+
 		freqs = get_frequencies(data) 
 		nodes = build_nodes(freqs)
 		heapq.heapify(nodes)
@@ -110,9 +119,12 @@ class Huffman(object):
 		return u"".join(chars)
 	
 	def encode(self, string):
-		pass
+		binstring = self.encode_to_binary_string(string)
+		substr_gen = _substrings_of_length(binstring, 8, "0")
+		int_gen = (int(string, 2) for string in substr_gen)
+		return bytearray(int_gen)
 	
-	def decode(self, string):
+	def decode(self, buff):
 		pass
 
 if __name__ == "__main__":
@@ -122,6 +134,6 @@ if __name__ == "__main__":
 		binary = encoder.encode_to_binary_string(data)
 		print "In:", data.encode("utf-8")
 		pprint.pprint(encoder.table)
-		print binary.encode("utf-8")
 		print encoder.decode_binary_string(binary).encode("utf-8")
+		print encoder.encode(data)
 
