@@ -72,11 +72,11 @@ class Huffman(object):
 				freqs[char] = val
 			return freqs 
 
-		def build_nodes(freqs):
-			return [HuffmanNode(char, val) for (char, val) in freqs.iteritems()]
-
 		freqs = get_frequencies(data) 
-		nodes = build_nodes(freqs)
+		return cls(freqs)
+	
+	def __init__(self, freqs):
+		nodes = [HuffmanNode(char, val) for (char, val) in freqs.iteritems()]
 		heapq.heapify(nodes)
 		while len(nodes) > 1:
 			min1 = heapq.heappop(nodes)
@@ -84,9 +84,6 @@ class Huffman(object):
 			new = HuffmanNode(None, min1.weight + min2.weight, min1, min2)
 			heapq.heappush(nodes, new)
 		tree = nodes[0]
-		return cls(tree)
-	
-	def __init__(self, tree):
 		self.tree = tree
 		self.table = tree.build_encode_table()
 	
