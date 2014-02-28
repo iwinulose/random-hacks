@@ -29,13 +29,6 @@ import sys
 import heapq
 import pprint
 
-def _substrings_of_length(string, n, padding):
-	length = len(string)
-	num_substrs = length / n
-	if length % n:
-		num_substrs += 1
-	for i in xrange(num_substrs):
-		yield string[i*n:i*n+n].ljust(n, padding)
 
 class DecodeError(Exception):
 	pass
@@ -101,31 +94,51 @@ class Huffman(object):
 	def encode_to_binary_string(self, string):
 		return u"".join((self.table[char] for char in string))
 	
-	def decode_binary_string(self, binstring):
-		chars = []
-		curr = self.tree
-		for char in binstring:
-			if char == '0' and curr.left:
-				curr = curr.left
-			elif char == '1' and curr.right:
-				curr = curr.right
-			else:
-				raise DecodeError("Could not decode binary string: char {} left {} right {}".format(char, curr.left, curr.right))
-			if curr.is_leaf():
-				chars.append(curr.obj)
-				curr = self.tree
-		if curr is not self.tree:
-			raise DecodeError("Ended on nonterminal")
-		return u"".join(chars)
-	
 	def encode(self, string):
+		def _substrings_of_length(string, n, padding):
+			length = len(string)
+			num_substrs = length / n
+			if length % n:
+				num_substrs += 1
+			for i in xrange(num_substrs):
+				yield string[i*n:i*n+n].ljust(n, padding)
+
 		binstring = self.encode_to_binary_string(string)
 		substr_gen = _substrings_of_length(binstring, 8, "0")
 		int_gen = (int(string, 2) for string in substr_gen)
 		return bytearray(int_gen)
+
+	def _decode(self, generator):
+		chars = []
+		curr = self.tree
+		for token in generator:
+			if not token and curr.left:
+				curr = curr.left
+			elif token and curr.right:
+				curr = curr.right
+			if curr.is_leaf():
+				chars.append(curr.obj)
+				curr = self.tree
+		return u"".join(chars)
+		
+	def decode_binary_string(self, binstring):
+		def _binary_string_generator(binstring):
+			for char in binstring:
+				if char == "0":
+					yield False
+				elif char == "1":
+					yield True
+				else:
+					raise DecodeError("Illegal character in binary string ({})".format(char))
+		return self._decode(_binary_string_generator(binstring))
 	
 	def decode(self, buff):
-		pass
+		def _binary_generator(buff):
+			for byte in buff:
+				for i in reversed(xrange(8)):
+					bit = byte & (1 << i)
+					yield bool(bit)
+		return self._decode(_binary_generator(buff))
 
 if __name__ == "__main__":
 	data =  sys.stdin.read().decode("utf-8")
@@ -135,5 +148,7 @@ if __name__ == "__main__":
 		print "In:", data.encode("utf-8")
 		pprint.pprint(encoder.table)
 		print encoder.decode_binary_string(binary).encode("utf-8")
-		print encoder.encode(data)
+		binary = encoder.encode(data)
+		print binary
+		print encoder.decode(binary)
 
