@@ -29,7 +29,6 @@ import sys
 import heapq
 import pprint
 
-
 class DecodeError(Exception):
 	pass
 
@@ -62,7 +61,7 @@ class HuffmanNode(object):
 
 class Huffman(object):
 	@classmethod
-	def	build_for_string(cls, string):
+	def build_for_string(cls, string):
 		def get_frequencies(string):
 			freqs = {}
 			for char in string:
