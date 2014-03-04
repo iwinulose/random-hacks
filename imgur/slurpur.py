@@ -91,6 +91,7 @@ def images(url_parts):
 		api_url = image_api_url(image_id)
 	else:
 		yield urlparse.urlunparse(url_parts)
+		return
 
 	api_response = requests.get(api_url, headers=auth_header)
 	api_response.raise_for_status()
