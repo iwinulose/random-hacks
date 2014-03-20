@@ -143,14 +143,24 @@ def make_filename(url, prefix, counter):
 		base = "{}-{}".format(prefix, counter)
 	return "{}{}".format(base, ext)
 
-def process(url_parts, output_dir=".", prefix=None, counter=0):
+def already_downloaded(path):
+	try:
+		stat = os.stat(path)
+		return stat.st_size != 0
+	except OSError as e:
+		return False
+
+def process(url_parts, output_dir=".", prefix=None, counter=0, overwrite=False):
 	try:
 		for url in images(url_parts):
 			filename = make_filename(url, prefix, counter)
-			filename = os.path.join(output_dir, filename)
-			print "Downloading {} to {}".format(url, filename)
-			download(url, filename)
-			counter += 1
+			path = os.path.join(output_dir, filename)
+			if not already_downloaded(path) or overwrite:
+				print "Downloading {} to {}".format(url, path)
+				download(url, path)
+				counter += 1
+			else:
+				print "Skipping {}: {} already exists".format(url, path)
 	except RequestException as e:
 		url = urlparse.urlunparse(url_parts)
 		sys.stderr.write("Error downloading from url {}: {}\n".format(url, e))
@@ -165,6 +175,7 @@ def main(args):
 	output_directory = args.output
 	prefix = args.prefix
 	should_flatten = args.flatten
+	overwrite = args.overwrite
 
 	urls = urls_for_args(in_arg, is_filename)
 	urls = filter(is_imgur_url, urls)
@@ -189,7 +200,7 @@ def main(args):
 		if not dest_ok:
 			print "Could not write to {}".format(final_output_dir)
 			continue
-		counter += process(url_parts, final_output_dir, prefix, counter)
+		counter += process(url_parts, final_output_dir, prefix, counter, overwrite)
 	return 0
 
 if __name__ == "__main__":
@@ -206,6 +217,9 @@ if __name__ == "__main__":
 	as a file name. The file should contain imgur URLs, one url per line.""")
 	parser.add_argument("--flatten", action="store_true", help="""Output all 
 	downloaded files in the same directory""")
+	parser.add_argument("--overwrite", action="store_true", help="""By default, slurpur will 
+	skip redownloading files (determined by the existence of a file of the same name at a 
+	given path with non-zero size). Pass to always download.""")
 	args = parser.parse_args()
 	try:
 		main(args)
