@@ -1,0 +1,3 @@
+[submodule "snap_proxy/pysnap_submod"]
+	path = snap_proxy/pysnap_submod
+	url = git@github.com:iwinulose/pysnap.git
