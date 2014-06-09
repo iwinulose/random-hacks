@@ -41,12 +41,15 @@ def main(args):
 		try:
 			input = open(arg, "r")
 		except IOError as e:
-			sys.stderr.write("Unable to open file {}\n".format(arg))
+			sys.stderr.write("Unable to open file {}: {}\n".format(arg, e.strerror))
 			return -1
-	data = input.read()
-	j = json.loads(data)
-	print json.dumps(j, sort_keys=True, indent=4, separators=(',', ": "))
-	return 0
+	try:
+		j = json.load(input)
+		print json.dumps(j, sort_keys=True, indent=4, separators=(',', ": "))
+		return 0
+	except:
+		sys.stderr.write("Unable to parse input\n")
+		return -1
 	
 
 if __name__ == "__main__":
