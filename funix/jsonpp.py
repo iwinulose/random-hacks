@@ -29,14 +29,14 @@
 import json
 import sys
 
-USAGE= """Usage: jsonpp [file]"""
+USAGE = """Usage: jsonpp [file]"""
 
 def main(args):
 	input = sys.stdin
 	if args:
 		arg = args[0]
 		if arg in ("-h", "--help"):
-			print usage
+			print USAGE
 			return 0
 		try:
 			input = open(arg, "r")
