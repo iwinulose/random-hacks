@@ -174,3 +174,4 @@ char *escape_string_dynamic(const char *string) {
 	}
 	return escape_buf;
 }
+
