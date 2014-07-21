@@ -33,6 +33,56 @@ import posixpath
 import sys
 import os
 
+class AbstractItem(object):
+	def load(self):
+		pass
+	
+	def is_loaded(self):
+		pass
+	
+	def unload(self):
+		pass
+	
+	def save(self, fileOrPath):
+		pass
+		
+
+class AbstractAdaptor(object):
+	"""Abstract class to use different APIs with Slurpur.
+	
+	Some of these methods have stub bodies for easier subclassing. 
+	There is a moral argument to be made that they should all raise 
+	NotImplemented."""
+
+	def __init__(self, url, lazy=False):
+		"""Initializer. Takes the URL for this API. Optionally specify 
+		lazy=True to load the data from the source at initialization."""
+		self.url = url
+		if lazy:
+			self.load()
+
+	def valdiate_url(self, url):
+		"""Validates whether the given URL can be handled by this Adaptor"""
+		return True	 #or not implemented?
+	
+	def load(self):
+		"""Load the API data.
+		
+		Subclasses MUST override this method."""
+		raise NotImplementedError("Subclasses must override load")
+	
+	def is_loaded(self):
+		"""Returns whether the data have been loaded.
+		
+		Subclasses SHOULD override this method"""
+		return False
+	
+	def items(self):
+		pass
+
+class ImgurAdaptor(AbstractAdaptor):
+	pass
+
 client_id = "7259c2beefdb373"
 auth_header = {"Authorization" : "Client-ID %s" % client_id}
 
@@ -111,12 +161,22 @@ def download(url, destination):
 	with open(destination, "w") as f:
 		f.write(response.content)
 
-def is_imgur_url(url_parts):
+def get_url_base(url_parts):
 	base = url_parts.netloc
 	if len(url_parts.scheme) == 0:
 		# If the url was provided without the scheme, search the path instead
 		base = url_parts.path
-	return "imgur.com" in base.lower()
+	base = base.lower()
+	return base
+
+def is_imgur_url(url_parts):
+	return "imgur.com" in get_url_base(url_parts)
+
+def is_gfycat_url(url_parts):
+	return "gfycat.com" in get_url_base(url_parts)
+
+def is_valid_url(url_parts):
+	return is_imgur_url(url_parts)# or is_gfycat_url(url_parts)
 
 def urls_for_args(in_arg, is_filename):
 	urls = None
@@ -178,9 +238,9 @@ def main(args):
 	overwrite = args.overwrite
 
 	urls = urls_for_args(in_arg, is_filename)
-	urls = filter(is_imgur_url, urls)
+	urls = filter(is_valid_url, urls)
 	if not urls:
-		print "No imgur urls provided"
+		print "No valid urls provided"
 		return 0
 	
 	print "Downloading from {} urls".format(len(urls))
