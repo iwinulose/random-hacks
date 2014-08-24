@@ -40,17 +40,25 @@ _headers = {
 #TODO:
 # - option for more than just submission (comment, all)
 
-def make_url(username):
-	"""Create the API url for submissions"""
-	return "http://api.reddit.com/user/{}/submitted".format(username)
+POST_TYPES = ("submitted", "comments", "all")
 
-def submitted_urls(username, after=None):
+def make_url(username, post_type=POST_TYPES[0]):
+	"""Create the API url for submissions"""
+	return "http://api.reddit.com/user/{user}/{type}".format(user=username, type=post_type)
+
+def submitted_urls(username, after=None, post_type=POST_TYPES[0], num_left=None):
 	"""Returns a set of all URLs submitted by the given user."""
+	num_to_fetch = 100
+	if num_left is not None:
+		if num_left > 100:
+			num_to_fetch = 100
+		else:
+			num_to_fetch = num_left
 	params = dict()
-	params["limit"] = 100
+	params["limit"] = num_to_fetch 
 	if after:
 		params["after"] = after
-	base_url = make_url(username)
+	base_url = make_url(username, post_type=post_type)
 	resp = requests.get(base_url, params=params, headers=_headers)
 	if resp.status_code != 200:
 		sys.stderr.write("Got a bad response ({})\n".format(resp))
@@ -59,8 +67,12 @@ def submitted_urls(username, after=None):
 	after = json["after"]
 	children = json["children"]
 	urls = set([post["data"]["url"] for post in children])
+	if num_left is not None:
+		num_left -= len(children)
+		if num_left <= 0:
+			return urls
 	if after:
-		next = submitted_urls(username, after)
+		next = submitted_urls(username, after=after, num_left=num_left)
 		urls = urls.union(next)
 	return urls
 	
@@ -68,14 +80,14 @@ if __name__ == "__main__":
 	parser = argparse.ArgumentParser(description="Lists all the (unique) urls of posts by a given reddit user")
 	parser.add_argument("username", help="The username")
 	parser.add_argument("--open", action="store_true", help="Open the links in a browser")
+	parser.add_argument("-t", "--post-type", help="User submissions, comments, or all posts", choices=POST_TYPES, default=POST_TYPES[0])
+	parser.add_argument("-n", "--number", type=int, default=None, help="Number of results to return (most recent.)")
 	args = parser.parse_args()
-	username = args.username
-	should_open = args.open
-	urls = submitted_urls(username)
+	urls = submitted_urls(args.username, post_type=args.post_type, num_left=args.number)
 	if urls:
 		urls = map(lambda url: url.encode('utf-8'), urls)
 		print "\n".join(urls)
-		if should_open:
+		if args.open:
 			for url in urls:
 				webbrowser.open(url)
 
