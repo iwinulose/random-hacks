@@ -37,10 +37,10 @@ class Config(object):
 		self.key = None
 		self.homies_by_id = {}
 		self.homie_names = set()
-		self.gen_config = False
 		self.custom_only = False
 		self.classic_only = True
-		self.threshold = args.threshold
+		self.threshold = 5
+		self.gen_config = False
 		if args.config:
 			self.read_config(args.config)
 		if args.key:
@@ -49,10 +49,12 @@ class Config(object):
 			self.read_summoners(args.summoner_list)
 		if args.gen_config:
 			self.gen_config = args.gen_config
-		if args.custom_only:
+		if not args.custom_only is None:
 			self.custom_only = args.custom_only
-		if args.all_game_modes:
-			self.classic_only = False
+		if not args.classic_only is None:
+			self.classic_only = args.classic_only 
+		if not args.threshold is None:
+			self.threshold = args.threshold
 	
 	def __str__(self):
 		l = []
@@ -61,6 +63,12 @@ class Config(object):
 		l.append("Config(")
 		l.append("\tkey:")
 		l.append("\t\t{}".format(self.key))
+		l.append("\tthreshold:")
+		l.append("\t\t{}".format(self.threshold))
+		l.append("\tcustom_only:")
+		l.append("\t\t{}".format(self.custom_only))
+		l.append("\tclassic_only:")
+		l.append("\t\t{}".format(self.classic_only))
 		l.append("\thomies:")
 		l.extend(homies_lines)
 		l.append("\tnames:")
@@ -84,6 +92,12 @@ class Config(object):
 				self.homies_by_id[id] = homie
 		if u"names" in obj:
 			self.homie_names = set(obj[u"names"])
+		if u"threshold" in obj:
+			self.threshold = obj[u"threshold"]
+		if u"custom_only" in obj:
+			self.custom_only = obj[u"custom_only"]
+		if u"classic_only" in obj:
+			self.classic_only = obj[u"classic_only"]
 	
 	def read_summoners(self, file):
 		for line in file:
@@ -93,7 +107,10 @@ class Config(object):
 	
 	def write_config(self, file):
 		d = {}
-		d[u"version"] = "0.1"
+		d[u"version"] = "0.2"
+		d[u"threshold"] = self.threshold
+		d[u"custom_only"] = self.custom_only
+		d[u"classic_only"] = self.classic_only
 		if self.key:
 			d[u"key"] = self.key
 		if self.homies():
@@ -151,17 +168,23 @@ def main(config):
 
 if __name__ == "__main__":
 	parser = argparse.ArgumentParser()
-	parser.add_argument("--threshold", "-t", type=int, default=5, help="Threshold for how many games it takes to be an inhouse game")
-	parser.add_argument("--custom-only", action="store_true", help="Only include custom games")
-	parser.add_argument("--all-game-modes", action="store_true", help="Include games from all game modes (defaults to classic only)")
-	config_group = parser.add_argument_group("Configuration options")
+	parser.add_argument("--gen-config", action="store_true", help="Generate a config file for later use with --config. The file is written to stdout. This file contains your key, so keep it safe.")
+	config_group = parser.add_argument_group("Configuration options", description="Arguments can be written to a configuration file using --gen-config and reused later with --config; options supplied on the command line take precedence over those supplied in the config file.")
+	game_modes_group = config_group.add_mutually_exclusive_group()
+	game_modes_group.add_argument("--all-game-modes", dest="classic_only", action="store_false", help="Include games from all game modes")
+	game_modes_group.add_argument("--classic-only", action="store_true", default=None, help="Include games from the classic mode only (default)")
+	config_group.add_argument("--config", "-c",  type=argparse.FileType('r'), help="The config file to use. Arguments provided on the command line override options in the config file.")
+	custom_group = config_group.add_mutually_exclusive_group()
+	custom_group.add_argument("--custom-games-only", dest="custom_only", action="store_true", default=None, help="Only include custom games")
+	custom_group.add_argument("--all-games", dest="custom_only", action="store_false", help="Include data from all games (default)")
 	config_group.add_argument("--key", "-k", help="The Riot API key to use.")
 	config_group.add_argument("--summoner-list", '-l', type=argparse.FileType('r'), help="A file containing the summoner names, one per line.")
-	config_group.add_argument("--config", "-c",  type=argparse.FileType('r'), help="The config file to use.")
-	config_group.add_argument("--gen-config", action="store_true", help="Generate a config file for later use with --config and write it to stdout. This file contains your key so keep it safe.")
+	config_group.add_argument("--threshold", "-t", type=int, default=None, help="Threshold for how many games it takes to be an inhouse game")
 	args = parser.parse_args()
 	config = Config(args)
 	if not config.key:
 		parser.error("A key is required")
+	if config.threshold < 0 or config.threshold > 10:
+		parser.error("Threshold must be 0 <= threshold <= 10")
 	main(config)
 
