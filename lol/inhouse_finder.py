@@ -169,7 +169,7 @@ def main(config):
 if __name__ == "__main__":
 	parser = argparse.ArgumentParser()
 	parser.add_argument("--gen-config", action="store_true", help="Generate a config file for later use with --config. The file is written to stdout. This file contains your key, so keep it safe.")
-	config_group = parser.add_argument_group("Configuration options", description="Arguments can be written to a configuration file using --gen-config and reused later with --config; options supplied on the command line take precedence over those supplied in the config file.")
+	config_group = parser.add_argument_group("Configuration options", description="Arguments can be written to a configuration file using --gen-config and reused later with --config. Options supplied on the command line take precedence over those supplied in the config file.")
 	game_modes_group = config_group.add_mutually_exclusive_group()
 	game_modes_group.add_argument("--all-game-modes", dest="classic_only", action="store_false", help="Include games from all game modes")
 	game_modes_group.add_argument("--classic-only", action="store_true", default=None, help="Include games from the classic mode only (default)")
