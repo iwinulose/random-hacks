@@ -3,6 +3,9 @@ import argparse
 import riotwatcher
 import json
 from pprint import pprint
+import os
+import os.path
+
 
 class Homie(object):
 	def __init__(self, name, id):
@@ -32,15 +35,18 @@ def pprint_to_string(obj, strip=False):
 	return buf
 
 
-class Config(object):
+class Model(object):
 	def __init__(self, args):
+		self.api = None
 		self.key = None
 		self.homies_by_id = {}
 		self.homie_names = set()
 		self.custom_only = False
 		self.classic_only = True
-		self.threshold = 5
+		self.threshold = 4
 		self.gen_config = False
+		self.monitor = args.monitor
+		self.output_dir = args.output_dir
 		if args.config:
 			self.read_config(args.config)
 		if args.key:
@@ -55,12 +61,14 @@ class Config(object):
 			self.classic_only = args.classic_only 
 		if not args.threshold is None:
 			self.threshold = args.threshold
+		if self.key:
+			self.api = riotwatcher.RiotWatcher(self.key, enforce_limits=True)
 	
 	def __str__(self):
 		l = []
 		homies_lines = ["\t\t" + line for line in pprint_to_string(self.homies(), True).split("\n")]
 		names_lines = ["\t\t" + line for line in pprint_to_string(list(self.homie_names), True).split("\n")]
-		l.append("Config(")
+		l.append("Model(")
 		l.append("\tkey:")
 		l.append("\t\t{}".format(self.key))
 		l.append("\tthreshold:")
@@ -124,51 +132,86 @@ class Config(object):
 	
 	def homie_ids(self):
 		return self.homies_by_id.keys()
-
-
-def main(config):
-	riot = riotwatcher.RiotWatcher(config.key, enforce_limits=True)
-	if config.homie_names:
-		response = riot.get_summoners(config.homie_names)
-		if response:
-			for key in response:
-				homie_id = response[key][u"id"]
-				homie_name = response[key][u"name"]
-				homie = Homie(homie_name, homie_id)
-				config.homies_by_id[homie_id] = homie
-			config.homie_names = set()
-	if config.gen_config:
-		config.write_config(sys.stdout)
-		return 0
-	for homie in config.homies():
-		response = riot.get_recent_games(homie.id)
-		if response:
-			homie.recent_games = response[u"games"]
 	
-	inhouses = set()
+	def resolve_homie_names(self):
+		#Try to resolve names to IDs
+		if self.homie_names:
+			json = self.api.get_summoners(self.homie_names)
+			if json:
+				lower_homie_names = {name.lower(): name for name in self.homie_names}
+				for key in json:
+					homie_id = json[key][u"id"]
+					homie_name = json[key][u"name"]
+					homie = Homie(homie_name, homie_id)
+					self.homies_by_id[homie_id] = homie
+					if homie_name.lower() in lower_homie_names:
+						self.homie_names.remove(lower_homie_names[homie_name.lower()])
+	
+	def update_homie_games(self):
+		for homie in self.homies():
+			response = self.api.get_recent_games(homie.id)
+			if response:
+				homie.recent_games = response[u"games"]
+	
+	def identify_inhouses(self):
+		inhouses = set()
+		homie_id_set = frozenset(self.homie_ids())
+		for homie in self.homies():
+			for game in homie.recent_games:
+				is_classic = (game[u"gameMode"] == u"CLASSIC")
+				is_custom = (game[u"gameType"] == u"CUSTOM_GAME")
+				game_player_ids = set()
+				game_player_ids.add(homie.id)
+				game_id = game[u"gameId"]
+				for player in game[u"fellowPlayers"]:
+					game_player_ids.add(player[u'summonerId'])
+				if len(game_player_ids & homie_id_set) >= self.threshold:
+					if self.custom_only and not is_custom:
+						continue
+					if self.classic_only and not is_classic:
+						continue
+					inhouses.add(game[u"gameId"])
+		return inhouses
+		
 
-	homie_id_set = frozenset(config.homie_ids())
+def make_output_dir(path):
+	# technically a race here.
+	if os.path.exists(path):
+		return os.path.isdir(path) and os.access(path, os.W_OK)
+	else:
+		try:
+			os.mkdir(path)
+		except:
+			return False
+		return True
 
-	for homie in config.homies():
-		for game in homie.recent_games:
-			is_classic = (game[u"gameMode"] == u"CLASSIC")
-			is_custom = (game[u"gameType"] == u"CUSTOM_GAME")
-			fellow_player_ids = set()
-			game_id = game[u"gameId"]
-			for player in game[u"fellowPlayers"]:
-				fellow_player_ids.add(player[u'summonerId'])
-			if len(fellow_player_ids & homie_id_set) >= config.threshold:
-				if config.custom_only and not is_custom:
-					continue
-				inhouses.add(game[u"gameId"])
-				
+
+def main(model):
+	#set up the output directory
+	if model.output_dir:
+		if not make_output_dir(model.output_dir):
+			print "Could not create/access output directory"
+			sys.exit(1)
+
+	#if asked, generate config and exit
+	if model.gen_config:
+		model.write_config(sys.stdout)
+		sys.exit(0)
+	
+	model.resolve_homie_names()
+	model.update_homie_games()
+	inhouses = model.identify_inhouses()
+	
 	print "Games played with bros"
 	pprint(inhouses)
+
 
 
 if __name__ == "__main__":
 	parser = argparse.ArgumentParser()
 	parser.add_argument("--gen-config", action="store_true", help="Generate a config file for later use with --config. The file is written to stdout. This file contains your key, so keep it safe.")
+	parser.add_argument("--monitor", action="store_true", help="Periodically check for games and emit output as new games are detected.")
+	parser.add_argument("--output-dir", help="Directory to save game data into.")
 	config_group = parser.add_argument_group("Configuration options", description="Arguments can be written to a configuration file using --gen-config and reused later with --config. Options supplied on the command line take precedence over those supplied in the config file.")
 	game_modes_group = config_group.add_mutually_exclusive_group()
 	game_modes_group.add_argument("--all-game-modes", dest="classic_only", action="store_false", help="Include games from all game modes")
@@ -181,10 +224,10 @@ if __name__ == "__main__":
 	config_group.add_argument("--summoner-list", '-l', type=argparse.FileType('r'), help="A file containing the summoner names, one per line.")
 	config_group.add_argument("--threshold", "-t", type=int, default=None, help="Threshold for how many games it takes to be an inhouse game")
 	args = parser.parse_args()
-	config = Config(args)
-	if not config.key:
+	model = Model(args)
+	if not model.key:
 		parser.error("A key is required")
-	if config.threshold < 0 or config.threshold > 10:
+	if model.threshold < 0 or model.threshold > 10:
 		parser.error("Threshold must be 0 <= threshold <= 10")
-	main(config)
+	main(model) 
 
