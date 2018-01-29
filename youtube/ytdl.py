@@ -41,16 +41,29 @@ class ProgressMonitor(object):
 		if percentage > self._last_percentage:
 			self._last_percentage = percentage
 			print("{}%".format(percentage))
-		
+
+
+def choose_stream(stream_query):
+	# Only download mp4 videos with both audio and video tracks
+	filter_func = lambda stream: stream.mime_type == "video/mp4" and stream.video_codec and stream.audio_codec
+
+	# Sort by highest resolution
+	sort_func = lambda s1, s2: int(s2.resolution[:-1]) - int(s1.resolution[:-1])
+
+	filtered_streams = stream_query.filter(custom_filter_functions=(filter_func,)).all()
+	sorted_streams = sorted(filtered_streams, sort_func)
+	return sorted_streams[0]
+
 
 def main(args):
 	progress = ProgressMonitor()
 	video = pytube.YouTube(args.url, on_progress_callback=progress.progress_callback)
 	title = video.title
-	stream = video.streams.first()
+	stream = choose_stream(video.streams)
 	file_size_mb = float((stream.filesize)/(1024 * 1024))
 	print("Title: {}".format(title))
 	print("Filename: {}".format(stream.default_filename))
+	print("Resolution: {}".format(stream.resolution))
 	print("File size: {:.2f} MB".format(file_size_mb))
 	print("Downloading...")
 	stream.download()
