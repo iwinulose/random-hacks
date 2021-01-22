@@ -1,5 +1,5 @@
-#!/usr/bin/env python
-# Copyright (c) 2013, Charles Duyk
+#!/usr/bin/env python3
+# Copyright (c) 2021, Charles Duyk
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -28,7 +28,7 @@
 import requests
 from requests.exceptions import RequestException
 import argparse
-import urlparse
+import urllib.parse
 import posixpath
 import sys
 import os
@@ -140,7 +140,7 @@ def images(url_parts):
 		image_id = last_component(url_parts)
 		api_url = image_api_url(image_id)
 	else:
-		yield urlparse.urlunparse(url_parts)
+		yield urllib.parse.urlunparse(url_parts)
 		return
 
 	api_response = requests.get(api_url, headers=auth_header)
@@ -158,7 +158,7 @@ def images(url_parts):
 def download(url, destination):
 	response = requests.get(url, headers=auth_header)
 	response.raise_for_status()
-	with open(destination, "w") as f:
+	with open(destination, "wb") as f:
 		f.write(response.content)
 
 def get_url_base(url_parts):
@@ -190,8 +190,7 @@ def urls_for_args(in_arg, is_filename):
 		urls = [line.strip() for line in in_file]
 	else:
 		urls = [in_arg]
-	urls = map(lambda x: x.decode('utf-8'), urls)
-	urls = map(urlparse.urlparse, urls)
+	urls = list(map(urllib.parse.urlparse, urls))
 	return urls
 
 def make_filename(url, prefix, counter):
@@ -216,13 +215,13 @@ def process(url_parts, output_dir=".", prefix=None, counter=0, overwrite=False):
 			filename = make_filename(url, prefix, counter)
 			path = os.path.join(output_dir, filename)
 			if not already_downloaded(path) or overwrite:
-				print "Downloading {} to {}".format(url, path)
+				print("Downloading {} to {}".format(url, path))
 				download(url, path)
 				counter += 1
 			else:
-				print "Skipping {}: {} already exists".format(url, path)
+				print("Skipping {}: {} already exists".format(url, path))
 	except RequestException as e:
-		url = urlparse.urlunparse(url_parts)
+		url = urllib.parse.urlunparse(url_parts)
 		sys.stderr.write("Error downloading from url {}: {}\n".format(url, e))
 		if output_dir != "." and not os.listdir(output_dir):
 			sys.stderr.write("Cleaning up unused directory {}\n".format(output_dir))
@@ -238,16 +237,16 @@ def main(args):
 	overwrite = args.overwrite
 
 	urls = urls_for_args(in_arg, is_filename)
-	urls = filter(is_valid_url, urls)
+	urls = list(filter(is_valid_url, urls))
 	if not urls:
-		print "No valid urls provided"
+		print("No valid urls provided")
 		return 0
 	
-	print "Downloading from {} urls".format(len(urls))
+	print("Downloading from {} urls".format(len(urls)))
 
 	dest_ok = prepare_destination(output_directory)
 	if not dest_ok:
-		print "Could not write to {}".format(output_directory)
+		print("Could not write to {}".format(output_directory))
 		return -1
 
 	counter = 0
@@ -258,7 +257,7 @@ def main(args):
 			final_output_dir = os.path.join(output_directory, subdir)
 		dest_ok = prepare_destination(final_output_dir)
 		if not dest_ok:
-			print "Could not write to {}".format(final_output_dir)
+			print("Could not write to {}".format(final_output_dir))
 			continue
 		counter += process(url_parts, final_output_dir, prefix, counter, overwrite)
 	return 0
