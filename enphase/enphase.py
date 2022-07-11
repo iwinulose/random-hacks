@@ -6,11 +6,11 @@ TOKEN_URL = "https://api.enphaseenergy.com/oauth/token"
 DEFAULT_REDIRECT_URI = "https://api.enphaseenergy.com/oauth/redirect_uri"
 
 def create_auth_header_dict(auth_string):
-	header_string = f"Basic {client_info_b64}"
+	header_string = f"Basic {auth_string}"
 	return {"Authorization" : header_string}
 
 class EnphaseClient:
-	def __init__(self, clientID, clientSecret, redirectURI=DEFAULT_REDIRECT_URI)
+	def __init__(self, clientID, clientSecret, redirectURI=DEFAULT_REDIRECT_URI):
 		self.clientID = clientID
 		self.clientSecret = clientSecret
 		self.redirectURI = redirectURI
@@ -45,7 +45,7 @@ if __name__ == "__main__":
 	client = EnphaseClient(client_id, client_secret)
 	url = client.generate_authorization_url()
 
-	print(f"Visit this URL to authorize the script")
+	print(f"Visit this URL to authorize the script: {url}")
 
 	# Open this URL in the browser and get the code from teh web
 	code = input("Enter the code from the authorization page:")
