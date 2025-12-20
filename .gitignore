@@ -24,3 +24,6 @@
 venv/
 env/
 ENV/
+
+# Other
+.DS_Store
