@@ -15,3 +15,12 @@
 *.exe
 *.out
 *.app
+
+# Environment variables
+.env
+.env.local
+
+# Python virtual environments
+venv/
+env/
+ENV/
