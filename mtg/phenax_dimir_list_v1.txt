@@ -43,6 +43,7 @@
 1x Negate (fdn) [Removal]
 1x Nighthowler (clb) [Pump]
 1x No Mercy (dmr) [Protection]
+1x Notion Thief (ltc) [Maybeboard{noDeck}{noPrice},Draw]
 1x Phenax, God of Deception (plst) [Commander{top}]
 1x Phyrexian Arena (fdn) [Draw]
 1x Propaganda (fic) [Protection]
