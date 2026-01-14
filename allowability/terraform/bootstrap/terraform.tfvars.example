@@ -1,0 +1,7 @@
+# Example Terraform variables file for bootstrap
+# Copy this to terraform.tfvars and customize as needed
+
+# AWS Configuration
+aws_profile  = "your-aws-profile-name"
+aws_region   = "us-west-2"
+project_name = "allowability"
