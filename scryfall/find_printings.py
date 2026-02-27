@@ -204,6 +204,48 @@ def to_markdown_tables_by_rarity(cards: list[CardPrintings]) -> str:
     return "\n".join(out).strip()
 
 
+def to_markdown_tables_by_set(cards: list[CardPrintings]) -> str:
+    """Group by set; one section per set with Card | Rarity. Sets ordered by card count (desc) then release date (newest first)."""
+    # set_code -> (set_name, released_at, list of (card_name, rarity))
+    by_set: dict[str, tuple[str, str, list[tuple[str, str]]]] = {}
+    for card in cards:
+        for p in card.printings:
+            if p.code == "—":
+                continue
+            if p.code not in by_set:
+                by_set[p.code] = (p.set_name, p.released_at, [])
+            by_set[p.code][2].append((card.name, p.rarity or "—"))
+
+    # Sort: most cards first, then newest release date first
+    set_items = [
+        (code, set_name, released_at, entries)
+        for code, (set_name, released_at, entries) in by_set.items()
+    ]
+    # Sort by card count (desc), then by release date newest first (stable: date first, then count).
+    set_items.sort(key=lambda x: x[2] or "", reverse=True)
+    set_items.sort(key=lambda x: len(x[3]), reverse=True)
+
+    rarity_order = {r: i for i, r in enumerate(RARITY_ORDER)}
+
+    out = []
+    for code, set_name, released_at, entries in set_items:
+        heading_date = f" ({released_at})" if released_at else ""
+        out.append(f"\n### {code} - {set_name}{heading_date}\n")
+        out.append("| Card | Rarity |")
+        out.append("|------|--------|")
+        for name, rarity in sorted(
+            entries,
+            key=lambda e: (
+                rarity_order.get((e[1] or "").lower(), len(RARITY_ORDER)),
+                e[0].lower(),
+            ),
+        ):
+            name_esc = name.replace("|", "\\|")
+            r_esc = rarity_display_name(rarity).replace("|", "\\|")
+            out.append(f"| {name_esc} | {r_esc} |")
+    return "\n".join(out).strip()
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(
         description="Look up Scryfall printings for a list of card names and output a markdown table."
@@ -222,6 +264,13 @@ def main() -> int:
         default=None,
         help="Output file for markdown table (default: stdout)",
     )
+    parser.add_argument(
+        "-g",
+        "--group-by",
+        choices=["rarity", "set"],
+        default="rarity",
+        help="Group output by rarity or set (default: rarity)",
+    )
     args = parser.parse_args()
 
     stream = args.input if args.input is not None else sys.stdin
@@ -237,7 +286,10 @@ def main() -> int:
             time.sleep(0.1)
         cards.append(fetch_printings(name))
 
-    out.write(to_markdown_tables_by_rarity(cards))
+    if args.group_by == "set":
+        out.write(to_markdown_tables_by_set(cards))
+    else:
+        out.write(to_markdown_tables_by_rarity(cards))
     if out != sys.stdout:
         out.close()
     return 0
