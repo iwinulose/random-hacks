@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """
-Look up Magic card printings via Scryfall API and output a markdown table.
+Look up Magic card printings via Scryfall API and output grouped tables.
 Reads card names from stdin or a file; outputs card name, rarity, and sets printed in.
+Supports markdown (pipe tables) or terminal-friendly table format.
 """
 
 import argparse
@@ -17,6 +18,31 @@ USER_AGENT = "find_printings/1.0 (https://github.com/your-repo)"
 # Most rare to least rare (for separate tables and set order)
 RARITY_ORDER = ("mythic", "rare", "special", "uncommon", "common", "bonus")
 
+# Price buckets for group-by price: (min_inclusive, max_exclusive, label)
+PRICE_BUCKETS = [
+    (0.0, 1.0, "< $1"),
+    (1.0, 5.0, "$1–4.99"),
+    (5.0, 10.0, "$5–9.99"),
+    (10.0, 20.0, "$10–19.99"),
+    (20.0, 50.0, "$20–50"),
+    (50.0, float("inf"), "$50+"),
+]
+PRICE_BUCKET_ORDER = [label for _, _, label in reversed(PRICE_BUCKETS)]
+
+
+def _cheaper_usd(card: dict) -> float | None:
+    """Return the cheaper of usd and usd_foil from a Scryfall card, or None."""
+    prices = card.get("prices") or {}
+    vals = []
+    for key in ("usd", "usd_foil"):
+        s = prices.get(key)
+        if s is not None and s.strip():
+            try:
+                vals.append(float(s))
+            except ValueError:
+                pass
+    return min(vals) if vals else None
+
 
 @dataclass(frozen=True)
 class Printing:
@@ -26,6 +52,7 @@ class Printing:
     set_name: str
     released_at: str
     rarity: str
+    usd_price: float | None  # cheaper of usd / usd_foil
 
 
 @dataclass
@@ -42,6 +69,15 @@ class CardPrintings:
         return _primary_rarity(self.rarities)
 
 
+@dataclass
+class Section:
+    """A grouped section of output: title plus a table (headers + rows)."""
+
+    title: str
+    headers: list[str]
+    rows: list[list[str]]
+
+
 def parse_card_line(line: str) -> str | None:
     """Strip comments, counts (e.g. 1x, 2 x), and return card name or None if empty."""
     line = line.strip()
@@ -52,13 +88,14 @@ def parse_card_line(line: str) -> str | None:
     return line if line else None
 
 
-def read_card_names(stream) -> list[str]:
+def read_card_names(stream, unique: bool = True) -> list[str]:
     """Read card names from stream, skipping comments and counts."""
     names = []
     for line in stream:
         name = parse_card_line(line)
         if name:
             names.append(name)
+    names = list(set(names)) if unique else names
     return names
 
 
@@ -92,7 +129,7 @@ def fetch_printings(card_name: str) -> CardPrintings:
             return CardPrintings(
                 name=card_name,
                 rarities=["—"],
-                printings=[Printing("—", "Not found", "", "—")],
+                printings=[Printing("—", "Not found", "", "—", None)],
             )
         r.raise_for_status()
         data = r.json()
@@ -101,7 +138,7 @@ def fetch_printings(card_name: str) -> CardPrintings:
             return CardPrintings(
                 name=card_name,
                 rarities=["—"],
-                printings=[Printing("—", "Not found", "", "—")],
+                printings=[Printing("—", "Not found", "", "—", None)],
             )
 
         for card in data.get("data", []):
@@ -109,12 +146,14 @@ def fetch_printings(card_name: str) -> CardPrintings:
             set_name = card.get("set_name") or code
             released_at = card.get("released_at") or ""
             rarity = card.get("rarity") or ""
+            usd_price = _cheaper_usd(card)
             if code not in printings_by_code:
                 printings_by_code[code] = Printing(
                     code=code,
                     set_name=set_name,
                     released_at=released_at,
                     rarity=rarity,
+                    usd_price=usd_price,
                 )
             canonical_name = canonical_name or card.get("name", card_name)
             if rarity:
@@ -156,6 +195,27 @@ def format_sets_cell(printings: list[Printing], primary_rarity: str) -> str:
     return "\n".join(lines)
 
 
+def format_price(price: float | None) -> str:
+    """Format USD price for display."""
+    return f"${price:.2f}" if price is not None else "—"
+
+
+def _lowest_price(card: CardPrintings) -> float:
+    """Lowest USD price across all printings; 0 if none."""
+    prices = [p.usd_price for p in card.printings if p.usd_price is not None]
+    return min(prices) if prices else 0.0
+
+
+def _price_bucket_label(price: float | None) -> str:
+    """Return the bucket label for a price; 'No price' if None or no bucket."""
+    if price is None or price <= 0:
+        return "No price"
+    for lo, hi, label in PRICE_BUCKETS:
+        if lo <= price < hi:
+            return label
+    return "No price"
+
+
 def rarity_display_name(rarity: str) -> str:
     """Title-case rarity for section headings."""
     if not rarity or rarity == "—":
@@ -163,92 +223,230 @@ def rarity_display_name(rarity: str) -> str:
     return rarity.capitalize()
 
 
-def to_markdown_tables_by_rarity(cards: list[CardPrintings]) -> str:
-    """Group cards by primary (rarest) rarity; one table per rarity."""
+def build_sections_by_rarity(cards: list[CardPrintings], sort_by: str) -> list[Section]:
+    """Group cards by primary (rarest) rarity; one section per rarity."""
     by_rarity: dict[str, list[CardPrintings]] = {}
     for card in cards:
         key = card.primary_rarity.lower()
         by_rarity.setdefault(key, []).append(card)
 
-    out = []
+    if sort_by == "price":
+        sort_key = lambda c: (-_lowest_price(c), c.name.lower())
+    else:
+        sort_key = lambda c: c.name.lower()
+
+    sections: list[Section] = []
     seen_rarities = set()
 
     for rarity in RARITY_ORDER:
         if rarity not in by_rarity:
             continue
         seen_rarities.add(rarity)
-        group = sorted(by_rarity[rarity], key=lambda c: c.name.lower())
-        out.append(f"\n### {rarity_display_name(rarity)}\n")
-        out.append("| Card | Rarity | Sets |")
-        out.append("|------|--------|------|")
+        group = sorted(by_rarity[rarity], key=sort_key)
+        rows = []
         for card in group:
-            name_esc = card.name.replace("|", "\\|")
-            r_esc = ", ".join(card.rarities).replace("|", "\\|")
+            r_str = ", ".join(card.rarities)
             sets_str = format_sets_cell(card.printings, card.primary_rarity)
-            sets_esc = sets_str.replace("|", "\\|").replace("\n", "<br>")
-            out.append(f"| {name_esc} | {r_esc} | {sets_esc} |")
+            # Lowest price among all printings and the set code where it occurs
+            with_prices = [(p.usd_price, p.code) for p in card.printings if p.usd_price is not None]
+            if with_prices:
+                low_price, low_code = min(with_prices, key=lambda x: (x[0], x[1]))
+                low_str = f"{format_price(low_price)} ({low_code})"
+            else:
+                low_str = "—"
+            rows.append([card.name, r_str, low_str, sets_str])
+        sections.append(
+            Section(
+                title=rarity_display_name(rarity),
+                headers=["Card", "Rarity", "Lowest", "Sets"],
+                rows=rows,
+            )
+        )
 
     for rarity_key, group in sorted(by_rarity.items()):
         if rarity_key in seen_rarities:
             continue
-        group = sorted(group, key=lambda c: c.name.lower())
-        out.append(f"\n### {rarity_display_name(rarity_key)}\n")
-        out.append("| Card | Rarity | Sets |")
-        out.append("|------|--------|------|")
+        group = sorted(group, key=sort_key)
+        rows = []
         for card in group:
-            name_esc = card.name.replace("|", "\\|")
-            r_esc = ", ".join(card.rarities).replace("|", "\\|")
+            r_str = ", ".join(card.rarities)
             sets_str = format_sets_cell(card.printings, card.primary_rarity)
-            sets_esc = sets_str.replace("|", "\\|").replace("\n", "<br>")
-            out.append(f"| {name_esc} | {r_esc} | {sets_esc} |")
-    return "\n".join(out).strip()
+            with_prices = [(p.usd_price, p.code) for p in card.printings if p.usd_price is not None]
+            if with_prices:
+                low_price, low_code = min(with_prices, key=lambda x: (x[0], x[1]))
+                low_str = f"{format_price(low_price)} ({low_code})"
+            else:
+                low_str = "—"
+            rows.append([card.name, r_str, low_str, sets_str])
+        sections.append(
+            Section(
+                title=rarity_display_name(rarity_key),
+                headers=["Card", "Rarity", "Lowest", "Sets"],
+                rows=rows,
+            )
+        )
+    return sections
 
 
-def to_markdown_tables_by_set(cards: list[CardPrintings]) -> str:
-    """Group by set; one section per set with Card | Rarity. Sets ordered by card count (desc) then release date (newest first)."""
-    # set_code -> (set_name, released_at, list of (card_name, rarity))
-    by_set: dict[str, tuple[str, str, list[tuple[str, str]]]] = {}
+def build_sections_by_price(cards: list[CardPrintings], sort_by: str) -> list[Section]:
+    """Group cards by price bucket (lowest price across printings); one section per bucket."""
+    by_bucket: dict[str, list[CardPrintings]] = {}
+    for card in cards:
+        low = _lowest_price(card) if any(p.usd_price is not None for p in card.printings) else None
+        if low is not None and low <= 0:
+            low = None
+        label = _price_bucket_label(low)
+        by_bucket.setdefault(label, []).append(card)
+
+    if sort_by == "price":
+        sort_key = lambda c: (-_lowest_price(c), c.name.lower())
+    else:
+        sort_key = lambda c: c.name.lower()
+
+    sections: list[Section] = []
+    for label in PRICE_BUCKET_ORDER + ["No price"]:
+        if label not in by_bucket:
+            continue
+        group = sorted(by_bucket[label], key=sort_key)
+        rows = []
+        for card in group:
+            r_str = ", ".join(card.rarities)
+            sets_str = format_sets_cell(card.printings, card.primary_rarity)
+            with_prices = [(p.usd_price, p.code) for p in card.printings if p.usd_price is not None]
+            if with_prices:
+                low_price, low_code = min(with_prices, key=lambda x: (x[0], x[1]))
+                low_str = f"{format_price(low_price)} ({low_code})"
+            else:
+                low_str = "—"
+            rows.append([card.name, r_str, low_str, sets_str])
+        sections.append(
+            Section(
+                title=label,
+                headers=["Card", "Rarity", "Lowest", "Sets"],
+                rows=rows,
+            )
+        )
+    return sections
+
+
+def build_sections_by_set(cards: list[CardPrintings], sort_by: str) -> list[Section]:
+    """Group by set; one section per set with Card, Rarity, Price. Sets ordered by card count (desc) then release date (newest first)."""
+    by_set: dict[str, tuple[str, str, list[tuple[str, str, float | None]]]] = {}
     for card in cards:
         for p in card.printings:
             if p.code == "—":
                 continue
             if p.code not in by_set:
                 by_set[p.code] = (p.set_name, p.released_at, [])
-            by_set[p.code][2].append((card.name, p.rarity or "—"))
+            by_set[p.code][2].append((card.name, p.rarity or "—", p.usd_price))
 
-    # Sort: most cards first, then newest release date first
     set_items = [
         (code, set_name, released_at, entries)
         for code, (set_name, released_at, entries) in by_set.items()
     ]
-    # Sort by card count (desc), then by release date newest first (stable: date first, then count).
     set_items.sort(key=lambda x: x[2] or "", reverse=True)
     set_items.sort(key=lambda x: len(x[3]), reverse=True)
 
     rarity_order = {r: i for i, r in enumerate(RARITY_ORDER)}
 
-    out = []
+    if sort_by == "rarity":
+        def entry_sort(e: tuple[str, str, float | None]) -> tuple[int, str]:
+            name, rarity, _ = e
+            return (rarity_order.get((rarity or "").lower(), len(RARITY_ORDER)), name.lower())
+    elif sort_by == "price":
+        def entry_sort(e: tuple[str, str, float | None]) -> tuple[float, str]:
+            name, _, price = e
+            return (-(price or 0.0), name.lower())
+    else:  # name
+        def entry_sort(e: tuple[str, str, float | None]) -> str:
+            return e[0].lower()
+
+    sections: list[Section] = []
+
     for code, set_name, released_at, entries in set_items:
         heading_date = f" ({released_at})" if released_at else ""
-        out.append(f"\n### {code} - {set_name}{heading_date}\n")
-        out.append("| Card | Rarity |")
-        out.append("|------|--------|")
-        for name, rarity in sorted(
-            entries,
-            key=lambda e: (
-                rarity_order.get((e[1] or "").lower(), len(RARITY_ORDER)),
-                e[0].lower(),
-            ),
-        ):
-            name_esc = name.replace("|", "\\|")
-            r_esc = rarity_display_name(rarity).replace("|", "\\|")
-            out.append(f"| {name_esc} | {r_esc} |")
+        title = f"{code} - {set_name}{heading_date}"
+        sorted_entries = sorted(entries, key=entry_sort)
+        rows = [
+            [name, rarity_display_name(rarity), format_price(price)]
+            for name, rarity, price in sorted_entries
+        ]
+        sections.append(
+            Section(title=title, headers=["Card", "Rarity", "Price"], rows=rows)
+        )
+    return sections
+
+
+def build_sections(cards: list[CardPrintings], group_by: str, sort_by: str) -> list[Section]:
+    """Build sections from cards according to group_by ('rarity', 'set', or 'price') and sort_by within each group."""
+    if group_by == "set":
+        return build_sections_by_set(cards, sort_by)
+    if group_by == "price":
+        return build_sections_by_price(cards, sort_by)
+    return build_sections_by_rarity(cards, sort_by)
+
+
+def format_sections_markdown(sections: list[Section]) -> str:
+    """Render sections as markdown tables."""
+    out = []
+    for sec in sections:
+        out.append(f"\n### {sec.title}\n")
+        out.append("| " + " | ".join(sec.headers) + " |")
+        out.append("|" + "|".join("------" for _ in sec.headers) + "|")
+        for row in sec.rows:
+            escaped = [
+                cell.replace("|", "\\|").replace("\n", "<br>")
+                for cell in row
+            ]
+            out.append("| " + " | ".join(escaped) + " |")
+    return "\n".join(out).strip()
+
+
+def _column_widths(headers: list[str], rows: list[list[str]]) -> list[int]:
+    """Compute max width per column (including header)."""
+    widths = [len(h) for h in headers]
+    for row in rows:
+        for i, cell in enumerate(row):
+            # Multi-line cells: use max line length
+            line_lens = [len(line) for line in cell.split("\n")]
+            w = max(line_lens) if line_lens else 0
+            if i < len(widths):
+                widths[i] = max(widths[i], w)
+            else:
+                widths.append(w)
+    return widths
+
+
+def format_sections_table(sections: list[Section]) -> str:
+    """Render sections as terminal-friendly fixed-width tables. Multi-line cells (e.g. sets) get one line per item."""
+    out = []
+    for sec in sections:
+        if not sec.rows:
+            out.append(f"\n{sec.title}\n")
+            continue
+        widths = _column_widths(sec.headers, sec.rows)
+        pad = "  "
+        header_line = pad.join(h.ljust(widths[i]) for i, h in enumerate(sec.headers))
+        sep = "-" * len(header_line)
+        out.append(f"\n{sec.title}\n")
+        out.append(header_line)
+        out.append(sep)
+        for row in sec.rows:
+            cell_lines = [cell.split("\n") for cell in row]
+            max_lines = max(len(lines) for lines in cell_lines)
+            for line_idx in range(max_lines):
+                cells = []
+                for i, lines in enumerate(cell_lines):
+                    w = widths[i] if i < len(widths) else 0
+                    line = lines[line_idx] if line_idx < len(lines) else ""
+                    cells.append(line.ljust(w))
+                out.append(pad.join(cells))
     return "\n".join(out).strip()
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Look up Scryfall printings for a list of card names and output a markdown table."
+        description="Look up Scryfall printings for a list of card names and output grouped tables."
     )
     parser.add_argument(
         "-i",
@@ -262,14 +460,28 @@ def main() -> int:
         "--output",
         type=argparse.FileType("w", encoding="utf-8"),
         default=None,
-        help="Output file for markdown table (default: stdout)",
+        help="Output file (default: stdout)",
     )
     parser.add_argument(
         "-g",
         "--group-by",
-        choices=["rarity", "set"],
+        choices=["rarity", "set", "price"],
         default="rarity",
-        help="Group output by rarity or set (default: rarity)",
+        help="Group output by rarity, set, or price bucket (default: rarity)",
+    )
+    parser.add_argument(
+        "-f",
+        "--format",
+        choices=["markdown", "table"],
+        default="markdown",
+        help="Output format: markdown (pipe tables) or table (terminal-friendly fixed-width) (default: markdown)",
+    )
+    parser.add_argument(
+        "-s",
+        "--sort-by",
+        choices=["rarity", "name", "price"],
+        default="rarity",
+        help="Sort within each group: rarity (then name), name, or price descending (default: rarity)",
     )
     args = parser.parse_args()
 
@@ -286,10 +498,11 @@ def main() -> int:
             time.sleep(0.1)
         cards.append(fetch_printings(name))
 
-    if args.group_by == "set":
-        out.write(to_markdown_tables_by_set(cards))
+    sections = build_sections(cards, args.group_by, args.sort_by)
+    if args.format == "table":
+        out.write(format_sections_table(sections))
     else:
-        out.write(to_markdown_tables_by_rarity(cards))
+        out.write(format_sections_markdown(sections))
     if out != sys.stdout:
         out.close()
     return 0
